@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-httpd
+  namespace: default
+  labels:
+    app: app2-httpd
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: app2-httpd
+  template:
+    metadata:
+      labels:
+        app: app2-httpd
+        version: v1
+      annotations:
+        prometheus.io/scrape: "false"
+    spec:
+      serviceAccountName: default
+      containers:
+      - name: httpd
+        image: httpd:2.4-alpine
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        
+        # Liveness Probe
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness Probe
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Resources
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        
+        # Volume mounts
+        volumeMounts:
+        - name: httpd-config
+          mountPath: /usr/local/apache2/conf/httpd.conf
+          subPath: httpd.conf
+          readOnly: true
+        - name: html
+          mountPath: /usr/local/apache2/htdocs
+          readOnly: true
+        - name: log
+          mountPath: /var/log/apache2
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+        fsGroup: 33
+      
+      # Volumes
+      volumes:
+      - name: httpd-config
+        configMap:
+          name: app2-httpd-config
+          items:
+          - key: httpd.conf
+            path: httpd.conf
+      - name: html
+        configMap:
+          name: app2-httpd-config
+          items:
+          - key: index.html
+            path: index.html
+      - name: log
+        emptyDir: {}
+      
+      # Node affinity (opcional)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - app2-httpd
+              topologyKey: kubernetes.io/hostname

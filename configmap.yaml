@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app2-httpd-config
+  namespace: default
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Welcome to App2 Apache HTTPD</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 40px;
+          background-color: #f0f0f0;
+        }
+        .container {
+          background-color: white;
+          padding: 20px;
+          border-radius: 5px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+          color: #d9534f;
+          text-align: center;
+        }
+        p {
+          color: #666;
+          line-height: 1.6;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Welcome to App2 Apache HTTPD</h1>
+        <p>This application is deployed using ArgoCD in Kubernetes.</p>
+        <p><strong>Hostname:</strong> <span id="hostname"></span></p>
+        <p><strong>Pod IP:</strong> <span id="pod-ip"></span></p>
+        <p><strong>Web Server:</strong> Apache HTTPD</p>
+      </div>
+      <script>
+        document.getElementById('hostname').textContent = window.location.hostname;
+        document.getElementById('pod-ip').textContent = 'Running in Kubernetes cluster';
+      </script>
+    </body>
+    </html>
+  httpd.conf: |
+    ServerRoot "/etc/apache2"
+    Listen 80
+    LoadModule mpm_prefork_module modules/mod_mpm_prefork.so
+    LoadModule authn_file_module modules/mod_authn_file.so
+    LoadModule authn_core_module modules/mod_authn_core.so
+    LoadModule authz_host_module modules/mod_authz_host.so
+    LoadModule authz_groupfile_module modules/mod_authz_groupfile.so
+    LoadModule authz_user_module modules/mod_authz_user.so
+    LoadModule authz_core_module modules/mod_authz_core.so
+    LoadModule access_compat_module modules/mod_access_compat.so
+    LoadModule auth_basic_module modules/mod_auth_basic.so
+    LoadModule reqtimeout_module modules/mod_reqtimeout.so
+    LoadModule filter_module modules/mod_filter.so
+    LoadModule mime_module modules/mod_mime.so
+    LoadModule log_config_module modules/mod_log_config.so
+    LoadModule env_module modules/mod_env.so
+    LoadModule headers_module modules/mod_headers.so
+    LoadModule setenvif_module modules/mod_setenvif.so
+    LoadModule version_module modules/mod_version.so
+    LoadModule unixd_module modules/mod_unixd.so
+    LoadModule status_module modules/mod_status.so
+    LoadModule dir_module modules/mod_dir.so
+    LoadModule alias_module modules/mod_alias.so
+
+    <IfModule mpm_prefork_module>
+      StartServers 4
+      MinSpareServers 3
+      MaxSpareServers 10
+      MaxRequestWorkers 256
+      MaxConnectionsPerChild 3000
+    </IfModule>
+
+    LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+    LogFormat "%h %l %u %t \"%r\" %>s %b" common
+    CustomLog /proc/self/fd/1 common
+
+    ErrorLogFormat "[%{cu}T] [%-m:%l] [pid %P:tid %T] [client\ %a] %M"
+    ErrorLog /proc/self/fd/2
+
+    <VirtualHost *:80>
+      DocumentRoot "/usr/local/apache2/htdocs"
+      ServerName localhost
+
+      <Directory "/usr/local/apache2/htdocs">
+        Require all granted
+        Options Indexes FollowSymLinks
+        AllowOverride All
+      </Directory>
+
+      <Location /health>
+        SetHandler server-status
+      </Location>
+
+      <FilesMatch "\.php$">
+        SetHandler "proxy:unix:/run/php-fpm.sock|fcgi://localhost"
+      </FilesMatch>
+
+      RewriteEngine On
+      RewriteCond %{REQUEST_METHOD} ^TRACE
+      RewriteRule .* - [F]
+    </VirtualHost>
+
+    Include /etc/apache2/mods-enabled/*.load
