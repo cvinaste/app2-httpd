@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app2-httpd-config
-  namespace: default
+  namespace: httpd
 data:
   index.html: |
     <!DOCTYPE html>
