@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: app2-httpd-config
-  namespace: httpd
+  name: nginx2-config
+  namespace: cxb-aznginx-pre
 data:
   index.html: |
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Welcome to App2 Apache HTTPD</title>
+      <title>Welcome to App1 Nginx</title>
       <style>
         body {
           font-family: Arial, sans-serif;
@@ -22,7 +22,7 @@ data:
           box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         h1 {
-          color: #d9534f;
+          color: #333;
           text-align: center;
         }
         p {
@@ -33,11 +33,10 @@ data:
     </head>
     <body>
       <div class="container">
-        <h1>Welcome to App2 Apache HTTPD</h1>
+        <h1>Welcome to App1 Nginx</h1>
         <p>This application is deployed using ArgoCD in Kubernetes.</p>
         <p><strong>Hostname:</strong> <span id="hostname"></span></p>
         <p><strong>Pod IP:</strong> <span id="pod-ip"></span></p>
-        <p><strong>Web Server:</strong> Apache HTTPD</p>
       </div>
       <script>
         document.getElementById('hostname').textContent = window.location.hostname;
@@ -45,67 +44,51 @@ data:
       </script>
     </body>
     </html>
-  httpd.conf: |
-    ServerRoot "/etc/apache2"
-    Listen 80
-    LoadModule mpm_prefork_module modules/mod_mpm_prefork.so
-    LoadModule authn_file_module modules/mod_authn_file.so
-    LoadModule authn_core_module modules/mod_authn_core.so
-    LoadModule authz_host_module modules/mod_authz_host.so
-    LoadModule authz_groupfile_module modules/mod_authz_groupfile.so
-    LoadModule authz_user_module modules/mod_authz_user.so
-    LoadModule authz_core_module modules/mod_authz_core.so
-    LoadModule access_compat_module modules/mod_access_compat.so
-    LoadModule auth_basic_module modules/mod_auth_basic.so
-    LoadModule reqtimeout_module modules/mod_reqtimeout.so
-    LoadModule filter_module modules/mod_filter.so
-    LoadModule mime_module modules/mod_mime.so
-    LoadModule log_config_module modules/mod_log_config.so
-    LoadModule env_module modules/mod_env.so
-    LoadModule headers_module modules/mod_headers.so
-    LoadModule setenvif_module modules/mod_setenvif.so
-    LoadModule version_module modules/mod_version.so
-    LoadModule unixd_module modules/mod_unixd.so
-    LoadModule status_module modules/mod_status.so
-    LoadModule dir_module modules/mod_dir.so
-    LoadModule alias_module modules/mod_alias.so
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
 
-    <IfModule mpm_prefork_module>
-      StartServers 4
-      MinSpareServers 3
-      MaxSpareServers 10
-      MaxRequestWorkers 256
-      MaxConnectionsPerChild 3000
-    </IfModule>
+    events {
+      worker_connections 1024;
+    }
 
-    LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
-    LogFormat "%h %l %u %t \"%r\" %>s %b" common
-    CustomLog /proc/self/fd/1 common
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
 
-    ErrorLogFormat "[%{cu}T] [%-m:%l] [pid %P:tid %T] [client\ %a] %M"
-    ErrorLog /proc/self/fd/2
+      log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
 
-    <VirtualHost *:80>
-      DocumentRoot "/usr/local/apache2/htdocs"
-      ServerName localhost
+      access_log /var/log/nginx/access.log main;
 
-      <Directory "/usr/local/apache2/htdocs">
-        Require all granted
-        Options Indexes FollowSymLinks
-        AllowOverride All
-      </Directory>
+      sendfile on;
+      tcp_nopush on;
+      tcp_nodelay on;
+      keepalive_timeout 65;
+      types_hash_max_size 2048;
+      client_max_body_size 20M;
 
-      <Location /health>
-        SetHandler server-status
-      </Location>
+      gzip on;
+      gzip_disable "msie6";
 
-      <FilesMatch "\.php$">
-        SetHandler "proxy:unix:/run/php-fpm.sock|fcgi://localhost"
-      </FilesMatch>
+      server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
 
-      RewriteEngine On
-      RewriteCond %{REQUEST_METHOD} ^TRACE
-      RewriteRule .* - [F]
-    </VirtualHost>
+        location / {
+          root /usr/share/nginx/html;
+          index index.html index.htm;
+          try_files $uri $uri/ =404;
+        }
 
-    Include /etc/apache2/mods-enabled/*.load
+        location /health {
+          access_log off;
+          return 200 "healthy\n";
+          add_header Content-Type text/plain;
+        }
+      }
+    }

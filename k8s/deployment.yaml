@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app2-httpd
-  namespace: default
+  name: nginx2
+  namespace: cxb-aznginx-pre
   labels:
-    app: app2-httpd
+    app: nginx2
     version: v1
 spec:
   replicas: 3
@@ -15,19 +15,19 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: app2-httpd
+      app: app1-nginx
   template:
     metadata:
       labels:
-        app: app2-httpd
+        app: app1-nginx
         version: v1
       annotations:
         prometheus.io/scrape: "false"
     spec:
       serviceAccountName: default
       containers:
-      - name: httpd
-        image: httpd:2.4-alpine
+      - name: nginx
+        image: nginx:1.25-alpine
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
@@ -48,7 +48,7 @@ spec:
         # Readiness Probe
         readinessProbe:
           httpGet:
-            path: /
+            path: /health
             port: http
             scheme: HTTP
           initialDelaySeconds: 5
@@ -67,36 +67,40 @@ spec:
         
         # Volume mounts
         volumeMounts:
-        - name: httpd-config
-          mountPath: /usr/local/apache2/conf/httpd.conf
-          subPath: httpd.conf
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
           readOnly: true
         - name: html
-          mountPath: /usr/local/apache2/htdocs
+          mountPath: /usr/share/nginx/html
           readOnly: true
+        - name: cache
+          mountPath: /var/cache/nginx
         - name: log
-          mountPath: /var/log/apache2
+          mountPath: /var/log/nginx
       
       # Security context
       securityContext:
         runAsNonRoot: false
         runAsUser: 0
-        fsGroup: 33
+        fsGroup: 101
       
       # Volumes
       volumes:
-      - name: httpd-config
+      - name: nginx-config
         configMap:
-          name: app2-httpd-config
+          name: app1-nginx-config
           items:
-          - key: httpd.conf
-            path: httpd.conf
+          - key: nginx.conf
+            path: nginx.conf
       - name: html
         configMap:
-          name: app2-httpd-config
+          name: app1-nginx-config
           items:
           - key: index.html
             path: index.html
+      - name: cache
+        emptyDir: {}
       - name: log
         emptyDir: {}
       
@@ -111,5 +115,5 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - app2-httpd
+                  - app1-nginx
               topologyKey: kubernetes.io/hostname

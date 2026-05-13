@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: app2-httpd
-  namespace: default
+  name: nginx2
+  namespace: cxb-aznginx-pre
   labels:
-    app: app2-httpd
+    app: nginx2
   annotations:
-    description: "Service to expose app2-httpd deployment"
+    description: "Service to expose nginx2 deployment"
 spec:
   type: ClusterIP
   ports:
@@ -15,5 +15,5 @@ spec:
     targetPort: http
     protocol: TCP
   selector:
-    app: app2-httpd
+    app: app1-nginx
   sessionAffinity: None
