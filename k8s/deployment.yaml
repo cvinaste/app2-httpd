@@ -15,11 +15,11 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: app1-nginx
+      app: nginx2
   template:
     metadata:
       labels:
-        app: app1-nginx
+        app: nginx2
         version: v1
       annotations:
         prometheus.io/scrape: "false"
@@ -67,7 +67,7 @@ spec:
         
         # Volume mounts
         volumeMounts:
-        - name: nginx-config
+        - name: nginx2-config
           mountPath: /etc/nginx/nginx.conf
           subPath: nginx.conf
           readOnly: true
@@ -87,15 +87,15 @@ spec:
       
       # Volumes
       volumes:
-      - name: nginx-config
+      - name: nginx2-config
         configMap:
-          name: app1-nginx-config
+          name: nginx2-config
           items:
           - key: nginx.conf
             path: nginx.conf
       - name: html
         configMap:
-          name: app1-nginx-config
+          name: nginx2-config
           items:
           - key: index.html
             path: index.html
